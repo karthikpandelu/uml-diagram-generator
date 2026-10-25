@@ -1,5 +1,7 @@
 # UML Diagram Generator
 
+**🔗 Live app: <https://uml-diagram-generator-urh.pages.dev/>**
+
 A browser-based application for creating **UML class diagrams** from a simple
 text description.
 
@@ -198,6 +200,22 @@ source text ──► parser ──► AST ──┬──► error list (inline
                                  ▼
                          SVG renderer ──► PNG / SVG export
 ```
+
+---
+
+## Deployment
+
+The app is deployed on **Cloudflare Pages**:
+
+<https://uml-diagram-generator-urh.pages.dev/>
+
+It is a static client-side build (`npm run build` → `dist/`). Cloudflare Pages
+is connected to this GitHub repository and **automatically rebuilds and deploys
+on every push to `main`**. Build settings:
+
+- Framework preset: React (Vite)
+- Build command: `npm run build`
+- Build output directory: `dist`
 
 ---
 
