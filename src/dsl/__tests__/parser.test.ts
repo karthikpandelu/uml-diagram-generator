@@ -1,0 +1,137 @@
+import { describe, expect, it } from 'vitest';
+import { parse } from '../parser';
+
+describe('parser: classes', () => {
+  it('parses a class with fields and methods', () => {
+    const d = parse(`class User {
+      +id: int
+      -name: string
+      #createdAt: date
+      +login(password: string): bool
+      +logout()
+    }`);
+    expect(d.errors).toEqual([]);
+    expect(d.classes).toHaveLength(1);
+    const u = d.classes[0];
+    expect(u.name).toBe('User');
+    expect(u.fields).toEqual([
+      { visibility: 'public', name: 'id', type: 'int' },
+      { visibility: 'private', name: 'name', type: 'string' },
+      { visibility: 'protected', name: 'createdAt', type: 'date' },
+    ]);
+    expect(u.methods).toHaveLength(2);
+    expect(u.methods[0]).toEqual({
+      visibility: 'public',
+      name: 'login',
+      params: [{ name: 'password', type: 'string' }],
+      returnType: 'bool',
+    });
+    expect(u.methods[1]).toEqual({
+      visibility: 'public',
+      name: 'logout',
+      params: [],
+      returnType: undefined,
+    });
+  });
+
+  it('parses an empty class without braces', () => {
+    const d = parse('class Admin');
+    expect(d.errors).toEqual([]);
+    expect(d.classes[0]).toEqual({ name: 'Admin', fields: [], methods: [] });
+  });
+
+  it('parses a single-line class body', () => {
+    const d = parse('class X { +a: int }');
+    expect(d.errors).toEqual([]);
+    expect(d.classes[0].fields).toEqual([
+      { visibility: 'public', name: 'a', type: 'int' },
+    ]);
+  });
+
+  it('defaults visibility to public', () => {
+    const d = parse(`class X {
+      count: int
+    }`);
+    expect(d.classes[0].fields[0].visibility).toBe('public');
+  });
+
+  it('parses a method with multiple params', () => {
+    const d = parse(`class X {
+      +move(dx: int, dy: int): void
+    }`);
+    expect(d.classes[0].methods[0].params).toEqual([
+      { name: 'dx', type: 'int' },
+      { name: 'dy', type: 'int' },
+    ]);
+  });
+});
+
+describe('parser: relationships', () => {
+  const kinds = [
+    { src: 'A --|> B', kind: 'inheritance' },
+    { src: 'A ..|> B', kind: 'realization' },
+    { src: 'A --> B', kind: 'association' },
+    { src: 'A *-- B', kind: 'composition' },
+    { src: 'A o-- B', kind: 'aggregation' },
+    { src: 'A ..> B', kind: 'dependency' },
+  ] as const;
+
+  for (const { src, kind } of kinds) {
+    it(`parses ${kind}`, () => {
+      const d = parse(src);
+      expect(d.errors).toEqual([]);
+      expect(d.relationships[0]).toMatchObject({ from: 'A', to: 'B', kind });
+    });
+  }
+
+  it('creates stub classes for referenced-but-undeclared classes', () => {
+    const d = parse('A --> B');
+    expect(d.classes.map((c) => c.name).sort()).toEqual(['A', 'B']);
+  });
+
+  it('parses multiplicity and label', () => {
+    const d = parse('User "1" --> "*" Order : places');
+    expect(d.errors).toEqual([]);
+    expect(d.relationships[0]).toEqual({
+      from: 'User',
+      to: 'Order',
+      kind: 'association',
+      fromMult: '1',
+      toMult: '*',
+      label: 'places',
+    });
+  });
+
+  it('prefers longest operator match (--|> over -->)', () => {
+    const d = parse('A --|> B');
+    expect(d.relationships[0].kind).toBe('inheritance');
+  });
+});
+
+describe('parser: comments and errors', () => {
+  it('ignores line comments', () => {
+    const d = parse(`// a comment
+      class X   // trailing comment
+    `);
+    expect(d.errors).toEqual([]);
+    expect(d.classes[0].name).toBe('X');
+  });
+
+  it('reports a missing closing brace', () => {
+    const d = parse(`class X {
+      +a: int`);
+    expect(d.errors.some((e) => /closing "}"/.test(e.message))).toBe(true);
+  });
+
+  it('reports an unrecognized statement', () => {
+    const d = parse('this is nonsense');
+    expect(d.errors.some((e) => /Unrecognized/.test(e.message))).toBe(true);
+  });
+
+  it('keeps valid content despite an error elsewhere', () => {
+    const d = parse(`class Good
+      garbage line here`);
+    expect(d.classes[0].name).toBe('Good');
+    expect(d.errors.length).toBeGreaterThan(0);
+  });
+});
