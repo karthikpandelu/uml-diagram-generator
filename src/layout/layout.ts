@@ -69,9 +69,7 @@ export function memberLine(m: ClassNode['fields'][number]): string {
 
 export function methodLine(m: ClassNode['methods'][number]): string {
   const vis = VISIBILITY_SYMBOL[m.visibility];
-  const params = m.params
-    .map((p) => `${p.name}${p.type ? ': ' + p.type : ''}`)
-    .join(', ');
+  const params = m.params.map((p) => `${p.name}${p.type ? ': ' + p.type : ''}`).join(', ');
   return `${vis} ${m.name}(${params})${m.returnType ? ': ' + m.returnType : ''}`;
 }
 
@@ -83,7 +81,12 @@ function measure(cls: ClassNode): ClassMetrics {
   const methodLines = cls.methods.map(methodLine);
 
   const stereotypeLine = cls.stereotype ? CLASS_STEREOTYPE_LABEL[cls.stereotype] : undefined;
-  const allLines = [cls.name, ...(stereotypeLine ? [stereotypeLine] : []), ...fieldLines, ...methodLines];
+  const allLines = [
+    cls.name,
+    ...(stereotypeLine ? [stereotypeLine] : []),
+    ...fieldLines,
+    ...methodLines,
+  ];
   const longest = allLines.reduce((max, l) => Math.max(max, l.length), 0);
   const width = Math.max(MIN_WIDTH, Math.ceil(longest * CHAR_WIDTH) + PADDING_X * 2);
 

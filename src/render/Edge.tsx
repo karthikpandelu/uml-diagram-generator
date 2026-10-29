@@ -75,23 +75,47 @@ export function Edge({ edge }: Props) {
     // open arrowhead (two strokes)
     const p = markerPoints(last, dirTo, 12, 6).split(' ');
     decorations.push(
-      <polyline key="head" points={`${p[1]} ${p[0]} ${p[2]}`} fill="none" stroke={stroke} strokeWidth={1.5} />
+      <polyline
+        key="head"
+        points={`${p[1]} ${p[0]} ${p[2]}`}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+      />
     );
   } else if (kind === 'dependency') {
     const p = markerPoints(last, dirTo, 12, 6).split(' ');
     decorations.push(
-      <polyline key="head" points={`${p[1]} ${p[0]} ${p[2]}`} fill="none" stroke={stroke} strokeWidth={1.5} />
+      <polyline
+        key="head"
+        points={`${p[1]} ${p[0]} ${p[2]}`}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+      />
     );
   }
 
   // Diamond at the `from` end for composition/aggregation.
   if (kind === 'composition') {
     decorations.push(
-      <polygon key="diamond" points={diamondPoints(first, dirFrom, 18, 7)} fill={stroke} stroke={stroke} strokeWidth={1.5} />
+      <polygon
+        key="diamond"
+        points={diamondPoints(first, dirFrom, 18, 7)}
+        fill={stroke}
+        stroke={stroke}
+        strokeWidth={1.5}
+      />
     );
   } else if (kind === 'aggregation') {
     decorations.push(
-      <polygon key="diamond" points={diamondPoints(first, dirFrom, 18, 7)} fill="#ffffff" stroke={stroke} strokeWidth={1.5} />
+      <polygon
+        key="diamond"
+        points={diamondPoints(first, dirFrom, 18, 7)}
+        fill="#ffffff"
+        stroke={stroke}
+        strokeWidth={1.5}
+      />
     );
   }
 
@@ -100,7 +124,13 @@ export function Edge({ edge }: Props) {
 
   return (
     <g>
-      <polyline points={poly} fill="none" stroke={stroke} strokeWidth={1.5} strokeDasharray={dash} />
+      <polyline
+        points={poly}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+        strokeDasharray={dash}
+      />
       {decorations}
       {rel.label && (
         <text

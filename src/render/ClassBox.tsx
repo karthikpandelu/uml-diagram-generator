@@ -1,5 +1,10 @@
 import type { LaidOutClass } from '../layout/layout';
-import { CLASS_STEREOTYPE_LABEL, COMPARTMENT_PADDING_Y, LINE_HEIGHT, PADDING_X } from '../layout/layout';
+import {
+  CLASS_STEREOTYPE_LABEL,
+  COMPARTMENT_PADDING_Y,
+  LINE_HEIGHT,
+  PADDING_X,
+} from '../layout/layout';
 
 interface Props {
   item: LaidOutClass;

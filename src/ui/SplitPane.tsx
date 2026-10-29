@@ -59,7 +59,11 @@ export function SplitPane({ left, right, initial = 0.4, minLeft = 280, minRight 
     <div ref={containerRef} className="flex min-h-0 flex-1">
       <div
         className="min-w-0 border-r border-slate-200"
-        style={leftWidth === null ? { width: `${initial * 100}%` } : { width: leftWidth, flex: '0 0 auto' }}
+        style={
+          leftWidth === null
+            ? { width: `${initial * 100}%` }
+            : { width: leftWidth, flex: '0 0 auto' }
+        }
       >
         {left}
       </div>

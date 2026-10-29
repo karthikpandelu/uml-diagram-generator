@@ -6,8 +6,8 @@ import { downloadBlob } from './fileio';
 
 function getDiagramSvg(): SVGSVGElement {
   const el = document.getElementById(DIAGRAM_SVG_ID);
-  if (!el) throw new Error('Diagram SVG not found.');
-  return el as unknown as SVGSVGElement;
+  if (!(el instanceof SVGSVGElement)) throw new Error('Diagram SVG not found.');
+  return el;
 }
 
 export async function exportPng(filename = 'diagram.png') {
@@ -15,6 +15,8 @@ export async function exportPng(filename = 'diagram.png') {
   const width = Number(svg.getAttribute('width')) || svg.clientWidth;
   const height = Number(svg.getAttribute('height')) || svg.clientHeight;
 
+  // `toPng` is typed for HTMLElement; an SVGSVGElement works at runtime
+  // (html-to-image serializes any node), so a single narrow cast is needed here.
   const dataUrl = await toPng(svg as unknown as HTMLElement, {
     width,
     height,

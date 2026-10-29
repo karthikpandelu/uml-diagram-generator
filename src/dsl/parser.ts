@@ -374,10 +374,7 @@ function parseRelationship(
 // An endpoint is a class name with an optional "multiplicity" string.
 // For the left side the multiplicity follows the name (`A "1"`), for the
 // right side it precedes the name (`"*" B`).
-function extractEndpoint(
-  raw: string,
-  side: 'left' | 'right'
-): { name: string; mult?: string } {
+function extractEndpoint(raw: string, side: 'left' | 'right'): { name: string; mult?: string } {
   const multMatch = /"([^"]*)"/.exec(raw);
   let mult: string | undefined;
   let name = raw;

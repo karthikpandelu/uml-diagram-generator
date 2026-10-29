@@ -25,7 +25,11 @@ export function DiagramCanvas() {
   };
   const onMouseMove = (e: React.MouseEvent) => {
     if (!dragging.current) return;
-    setView((v) => ({ ...v, x: e.clientX - dragging.current!.x, y: e.clientY - dragging.current!.y }));
+    setView((v) => ({
+      ...v,
+      x: e.clientX - dragging.current!.x,
+      y: e.clientY - dragging.current!.y,
+    }));
   };
   const onMouseUp = () => {
     dragging.current = null;

@@ -77,9 +77,9 @@ export function HelpDialog({ onClose }: Props) {
   +logout()
 }`}</Block>
             <p className="mt-2">
-              Fields are <Code>name: type</Code>; methods are{' '}
-              <Code>name(params): returnType</Code>. The type and return type are optional. A class
-              with no members needs no braces: <Code>class Admin</Code>.
+              Fields are <Code>name: type</Code>; methods are <Code>name(params): returnType</Code>.
+              The type and return type are optional. A class with no members needs no braces:{' '}
+              <Code>class Admin</Code>.
             </p>
           </section>
 

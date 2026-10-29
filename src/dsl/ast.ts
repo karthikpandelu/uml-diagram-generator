@@ -35,12 +35,7 @@ export interface EnumNode {
 }
 
 export type RelationshipKind =
-  | 'inheritance'
-  | 'realization'
-  | 'association'
-  | 'composition'
-  | 'aggregation'
-  | 'dependency';
+  'inheritance' | 'realization' | 'association' | 'composition' | 'aggregation' | 'dependency';
 
 export interface Relationship {
   from: string;

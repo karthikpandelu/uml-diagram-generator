@@ -43,9 +43,7 @@ describe('parser: classes', () => {
   it('parses a single-line class body', () => {
     const d = parse('class X { +a: int }');
     expect(d.errors).toEqual([]);
-    expect(d.classes[0].fields).toEqual([
-      { visibility: 'public', name: 'a', type: 'int' },
-    ]);
+    expect(d.classes[0].fields).toEqual([{ visibility: 'public', name: 'a', type: 'int' }]);
   });
 
   it('defaults visibility to public', () => {

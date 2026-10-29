@@ -1,7 +1,13 @@
 // Lightweight regex-based syntax highlighting for the UML DSL.
 // Avoids a full Lezer grammar — we just decorate tokens per visible line.
 
-import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+import {
+  Decoration,
+  EditorView,
+  ViewPlugin,
+  type DecorationSet,
+  type ViewUpdate,
+} from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
 
 const keyword = Decoration.mark({ class: 'cm-uml-keyword' });
@@ -26,7 +32,9 @@ function buildDecorations(view: EditorView): DecorationSet {
       const codeEnd = commentIdx === -1 ? text.length : commentIdx;
 
       // Leading keyword(s): `class`, `enum`, `interface`, or `abstract class`.
-      const classMatch = /^(\s*)(abstract\s+class|class|enum|interface)\b/.exec(text.slice(0, codeEnd));
+      const classMatch = /^(\s*)(abstract\s+class|class|enum|interface)\b/.exec(
+        text.slice(0, codeEnd)
+      );
       if (classMatch) {
         const kw = classMatch[2];
         const start = line.from + classMatch[1].length;
@@ -41,7 +49,11 @@ function buildDecorations(view: EditorView): DecorationSet {
       const strRe = /"[^"]*"/g;
       let m: RegExpExecArray | null;
       while ((m = strRe.exec(text.slice(0, codeEnd)))) {
-        ranges.push({ from: line.from + m.index, to: line.from + m.index + m[0].length, deco: str });
+        ranges.push({
+          from: line.from + m.index,
+          to: line.from + m.index + m[0].length,
+          deco: str,
+        });
       }
 
       // operators

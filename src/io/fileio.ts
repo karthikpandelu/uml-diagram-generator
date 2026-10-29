@@ -1,9 +1,18 @@
 // Open/save .txt source files. Uses the File System Access API when available,
 // otherwise falls back to a download link / hidden file input.
 
+// `showSaveFilePicker` / `showOpenFilePicker` are not in the default TS DOM lib,
+// so we declare the minimal surface we use. `FileSystemFileHandle` itself (with
+// `createWritable()` / `getFile()`) *is* in the DOM lib, so the handle is fully typed.
+interface FilePickerOptions {
+  suggestedName?: string;
+  multiple?: boolean;
+  types?: { description?: string; accept: Record<string, string[]> }[];
+}
+
 interface WindowWithFS extends Window {
-  showSaveFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle>;
-  showOpenFilePicker?: (opts?: unknown) => Promise<FileSystemFileHandle[]>;
+  showSaveFilePicker?: (opts?: FilePickerOptions) => Promise<FileSystemFileHandle>;
+  showOpenFilePicker?: (opts?: FilePickerOptions) => Promise<FileSystemFileHandle[]>;
 }
 
 const w = window as WindowWithFS;
@@ -15,7 +24,7 @@ export async function saveTextFile(content: string, suggestedName = 'diagram.txt
         suggestedName,
         types: [{ description: 'Text file', accept: { 'text/plain': ['.txt'] } }],
       });
-      const writable = await (handle as any).createWritable();
+      const writable = await handle.createWritable();
       await writable.write(content);
       await writable.close();
       return;

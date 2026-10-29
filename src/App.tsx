@@ -6,6 +6,7 @@ import { openTextFile, saveTextFile } from './io/fileio';
 import { exportPng, exportSvg } from './io/export';
 import { SplitPane } from './ui/SplitPane';
 import { HelpDialog } from './ui/HelpDialog';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 function ToolbarButton({
   onClick,
@@ -119,7 +120,15 @@ export default function App() {
       </header>
 
       {/* Split pane (draggable divider) */}
-      <SplitPane left={<Editor />} right={<DiagramCanvas />} initial={0.4} />
+      <SplitPane
+        left={<Editor />}
+        right={
+          <ErrorBoundary>
+            <DiagramCanvas />
+          </ErrorBoundary>
+        }
+        initial={0.4}
+      />
 
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </div>
