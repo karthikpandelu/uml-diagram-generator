@@ -20,10 +20,18 @@ export interface Method {
   returnType?: string;
 }
 
+export type ClassStereotype = 'abstract' | 'interface';
+
 export interface ClassNode {
   name: string;
   fields: Member[];
   methods: Method[];
+  stereotype?: ClassStereotype;
+}
+
+export interface EnumNode {
+  name: string;
+  values: string[];
 }
 
 export type RelationshipKind =
@@ -51,6 +59,7 @@ export interface ParseError {
 
 export interface Diagram {
   classes: ClassNode[];
+  enums: EnumNode[];
   relationships: Relationship[];
   errors: ParseError[];
 }

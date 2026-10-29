@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useCallback } from 'react';
 import { useStore } from '../state/store';
 import { layout } from '../layout/layout';
 import { ClassBox } from './ClassBox';
+import { EnumBox } from './EnumBox';
 import { Edge } from './Edge';
 
 export const DIAGRAM_SVG_ID = 'uml-diagram-svg';
@@ -81,9 +82,13 @@ export function DiagramCanvas() {
             {laid.edges.map((edge, i) => (
               <Edge key={`e-${i}`} edge={edge} />
             ))}
-            {laid.classes.map((item) => (
-              <ClassBox key={item.node.name} item={item} />
-            ))}
+            {laid.nodes.map((item) =>
+              item.kind === 'enum' ? (
+                <EnumBox key={`enum-${item.node.name}`} item={item} />
+              ) : (
+                <ClassBox key={`class-${item.node.name}`} item={item} />
+              )
+            )}
           </svg>
         </g>
       </svg>

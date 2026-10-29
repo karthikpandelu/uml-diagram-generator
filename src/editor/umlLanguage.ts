@@ -25,11 +25,12 @@ function buildDecorations(view: EditorView): DecorationSet {
       const commentIdx = text.indexOf('//');
       const codeEnd = commentIdx === -1 ? text.length : commentIdx;
 
-      // `class` keyword at the start.
-      const classMatch = /^\s*(class)\b/.exec(text.slice(0, codeEnd));
+      // Leading keyword(s): `class`, `enum`, `interface`, or `abstract class`.
+      const classMatch = /^(\s*)(abstract\s+class|class|enum|interface)\b/.exec(text.slice(0, codeEnd));
       if (classMatch) {
-        const start = line.from + classMatch.index + classMatch[0].indexOf('class');
-        builder.add(start, start + 5, keyword);
+        const kw = classMatch[2];
+        const start = line.from + classMatch[1].length;
+        builder.add(start, start + kw.length, keyword);
       }
 
       // Visibility markers and operators + strings within the code portion.

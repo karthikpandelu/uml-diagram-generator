@@ -84,6 +84,43 @@ export function HelpDialog({ onClose }: Props) {
           </section>
 
           <section>
+            <h3 className="mb-1 font-semibold text-slate-800">Abstract classes &amp; interfaces</h3>
+            <p className="mb-2">
+              Prefix with <Code>abstract class</Code> or <Code>interface</Code>. They use the same
+              body as a class and render with a <Code>«abstract»</Code> / <Code>«interface»</Code>{' '}
+              stereotype and an italic name.
+            </p>
+            <Block>{`abstract class Shape {
+  +area(): float
+  +draw()
+}
+
+interface Drawable {
+  +render(): void
+}
+
+Circle --|> Shape        // extends an abstract class
+Circle ..|> Drawable     // implements an interface`}</Block>
+          </section>
+
+          <section>
+            <h3 className="mb-1 font-semibold text-slate-800">Define an enum</h3>
+            <p className="mb-2">
+              Use <Code>enum</Code> and list the values, one per line or comma-separated.
+            </p>
+            <Block>{`enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  CANCELLED
+}`}</Block>
+            <p className="mt-2">
+              Enums render with an <Code>«enumeration»</Code> stereotype and can be used in
+              relationships just like classes, e.g. <Code>Order --&gt; OrderStatus</Code>.
+            </p>
+          </section>
+
+          <section>
             <h3 className="mb-2 font-semibold text-slate-800">Relationships</h3>
             <table className="w-full border-collapse text-[13px]">
               <thead>

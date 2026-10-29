@@ -11,7 +11,9 @@
 
 import type {
   ClassNode,
+  ClassStereotype,
   Diagram,
+  EnumNode,
   Member,
   Method,
   Param,
@@ -57,9 +59,11 @@ const IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 export function parse(source: string): Diagram {
   const classes: ClassNode[] = [];
+  const enums: EnumNode[] = [];
   const relationships: Relationship[] = [];
   const errors: ParseError[] = [];
   const classIndex = new Map<string, ClassNode>();
+  const enumIndex = new Map<string, EnumNode>();
 
   const rawLines = source.split('\n');
   let i = 0;
@@ -69,7 +73,9 @@ export function parse(source: string): Diagram {
 
   // Ensure a class exists in the index (relationships may reference classes
   // that are not explicitly declared — we create a stub so they still render).
-  const ensureClass = (name: string): ClassNode => {
+  // A name already declared as an enum is left alone (no stub class created).
+  const ensureClass = (name: string): ClassNode | null => {
+    if (enumIndex.has(name)) return null;
     let c = classIndex.get(name);
     if (!c) {
       c = { name, fields: [], methods: [] };
@@ -77,6 +83,24 @@ export function parse(source: string): Diagram {
       classes.push(c);
     }
     return c;
+  };
+
+  // Register an enum, reusing any stub class that was created for the name.
+  const ensureEnum = (name: string): EnumNode => {
+    let e = enumIndex.get(name);
+    if (!e) {
+      e = { name, values: [] };
+      enumIndex.set(name, e);
+      enums.push(e);
+      // If a stub class was previously created for this name, drop it.
+      const stub = classIndex.get(name);
+      if (stub) {
+        classIndex.delete(name);
+        const idx = classes.indexOf(stub);
+        if (idx !== -1) classes.splice(idx, 1);
+      }
+    }
+    return e;
   };
 
   while (i < rawLines.length) {
@@ -89,22 +113,107 @@ export function parse(source: string): Diagram {
       continue;
     }
 
-    // ---- class definition ----
-    if (text.startsWith('class ') || text === 'class') {
-      const rest = text.slice(5).trim();
+    // ---- enum definition ----
+    if (text.startsWith('enum ') || text === 'enum') {
+      const rest = text.slice(4).trim();
       const braceIdx = rest.indexOf('{');
       const name = (braceIdx === -1 ? rest : rest.slice(0, braceIdx)).trim();
 
       if (!name) {
-        err(lineNo, 0, 'Expected a class name after "class".');
+        err(lineNo, 0, 'Expected an enum name after "enum".');
         i++;
         continue;
       }
       if (!IDENT_RE.test(name)) {
-        err(lineNo, 0, `Invalid class name "${name}".`);
+        err(lineNo, 0, `Invalid enum name "${name}".`);
+      }
+
+      const en = ensureEnum(name);
+
+      // Collect comma- and/or newline-separated values from a body.
+      const addValues = (body: string, atLine: number) => {
+        for (const part of body.split(/[,\n]/)) {
+          const v = part.trim();
+          if (!v) continue;
+          if (!IDENT_RE.test(v)) {
+            err(atLine, 0, `Invalid enum value "${v}" in "${name}".`);
+            continue;
+          }
+          en.values.push(v);
+        }
+      };
+
+      if (braceIdx === -1) {
+        // `enum Name` with no body, or body opens on following lines.
+        i++;
+        continue;
+      }
+
+      const afterBrace = rest.slice(braceIdx + 1);
+      if (afterBrace.includes('}')) {
+        addValues(afterBrace.slice(0, afterBrace.indexOf('}')), lineNo);
+        i++;
+        continue;
+      }
+
+      if (afterBrace.trim()) addValues(afterBrace, lineNo);
+      i++;
+      let closed = false;
+      while (i < rawLines.length) {
+        const bodyLine = stripComment(rawLines[i]).trim();
+        if (bodyLine.includes('}')) {
+          addValues(bodyLine.slice(0, bodyLine.indexOf('}')), i);
+          closed = true;
+          i++;
+          break;
+        }
+        if (bodyLine) addValues(bodyLine, i);
+        i++;
+      }
+      if (!closed) err(lineNo, 0, `Enum "${name}" is missing a closing "}".`);
+      continue;
+    }
+
+    // ---- class / abstract class / interface definition ----
+    // All three share the same body grammar; they differ only in the keyword
+    // prefix, which sets an optional stereotype.
+    let classKeyword: { prefix: string; stereotype?: ClassStereotype; label: string } | null = null;
+    if (text.startsWith('abstract class ') || text === 'abstract class') {
+      classKeyword = { prefix: 'abstract class', stereotype: 'abstract', label: 'abstract class' };
+    } else if (text.startsWith('interface ') || text === 'interface') {
+      classKeyword = { prefix: 'interface', stereotype: 'interface', label: 'interface' };
+    } else if (text.startsWith('class ') || text === 'class') {
+      classKeyword = { prefix: 'class', stereotype: undefined, label: 'class' };
+    }
+
+    if (classKeyword) {
+      const rest = text.slice(classKeyword.prefix.length).trim();
+      const braceIdx = rest.indexOf('{');
+      const name = (braceIdx === -1 ? rest : rest.slice(0, braceIdx)).trim();
+
+      if (!name) {
+        err(lineNo, 0, `Expected a name after "${classKeyword.label}".`);
+        i++;
+        continue;
+      }
+      if (!IDENT_RE.test(name)) {
+        err(lineNo, 0, `Invalid ${classKeyword.label} name "${name}".`);
       }
 
       const cls = ensureClass(name);
+      if (!cls) {
+        err(lineNo, 0, `"${name}" is already declared as an enum.`);
+        // Skip any brace body so its contents aren't parsed as statements.
+        if (braceIdx !== -1 && !rest.slice(braceIdx + 1).includes('}')) {
+          i++;
+          while (i < rawLines.length && !stripComment(rawLines[i]).includes('}')) i++;
+        }
+        i++;
+        continue;
+      }
+
+      // Apply the stereotype (last declaration wins if re-declared).
+      if (classKeyword.stereotype) cls.stereotype = classKeyword.stereotype;
 
       if (braceIdx === -1) {
         // No brace: either `class Name` alone, or `class Name {` on next lines.
@@ -137,7 +246,7 @@ export function parse(source: string): Diagram {
         if (bodyLine) parseMember(bodyLine, cls, i, 0, err);
         i++;
       }
-      if (!closed) err(lineNo, 0, `Class "${name}" is missing a closing "}".`);
+      if (!closed) err(lineNo, 0, `"${name}" is missing a closing "}".`);
       continue;
     }
 
@@ -151,7 +260,7 @@ export function parse(source: string): Diagram {
     i++;
   }
 
-  return { classes, relationships, errors };
+  return { classes, enums, relationships, errors };
 }
 
 // Parse a single member line into either a field or a method on `cls`.
