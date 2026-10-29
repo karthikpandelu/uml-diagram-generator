@@ -50,6 +50,12 @@ export default function App() {
     exportSvg();
   };
 
+  const handleClear = () => {
+    if (source === '' || window.confirm('Clear all text? This cannot be undone.')) {
+      setSource('');
+    }
+  };
+
   // Keyboard shortcuts: Cmd/Ctrl+S = save text, Cmd/Ctrl+Shift+S = save PNG.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -110,6 +116,10 @@ export default function App() {
             </div>
           )}
         </div>
+
+        <ToolbarButton onClick={handleClear} title="Clear all text">
+          Clear
+        </ToolbarButton>
 
         {/* Help button pushed to the right. */}
         <div className="ml-auto">
