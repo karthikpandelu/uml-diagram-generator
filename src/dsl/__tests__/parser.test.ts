@@ -14,19 +14,19 @@ describe('parser: classes', () => {
     expect(d.classes).toHaveLength(1);
     const u = d.classes[0];
     expect(u.name).toBe('User');
-    expect(u.fields).toEqual([
+    expect(u.fields).toMatchObject([
       { visibility: 'public', name: 'id', type: 'int' },
       { visibility: 'private', name: 'name', type: 'string' },
       { visibility: 'protected', name: 'createdAt', type: 'date' },
     ]);
     expect(u.methods).toHaveLength(2);
-    expect(u.methods[0]).toEqual({
+    expect(u.methods[0]).toMatchObject({
       visibility: 'public',
       name: 'login',
       params: [{ name: 'password', type: 'string' }],
       returnType: 'bool',
     });
-    expect(u.methods[1]).toEqual({
+    expect(u.methods[1]).toMatchObject({
       visibility: 'public',
       name: 'logout',
       params: [],
@@ -37,13 +37,13 @@ describe('parser: classes', () => {
   it('parses an empty class without braces', () => {
     const d = parse('class Admin');
     expect(d.errors).toEqual([]);
-    expect(d.classes[0]).toEqual({ name: 'Admin', fields: [], methods: [] });
+    expect(d.classes[0]).toMatchObject({ name: 'Admin', fields: [], methods: [] });
   });
 
   it('parses a single-line class body', () => {
     const d = parse('class X { +a: int }');
     expect(d.errors).toEqual([]);
-    expect(d.classes[0].fields).toEqual([{ visibility: 'public', name: 'a', type: 'int' }]);
+    expect(d.classes[0].fields).toMatchObject([{ visibility: 'public', name: 'a', type: 'int' }]);
   });
 
   it('defaults visibility to public', () => {
@@ -143,10 +143,8 @@ describe('parser: enums', () => {
     }`);
     expect(d.errors).toEqual([]);
     expect(d.enums).toHaveLength(1);
-    expect(d.enums[0]).toEqual({
-      name: 'Status',
-      values: ['ACTIVE', 'INACTIVE', 'PENDING'],
-    });
+    expect(d.enums[0].name).toBe('Status');
+    expect(d.enums[0].values.map((v) => v.name)).toEqual(['ACTIVE', 'INACTIVE', 'PENDING']);
     // An enum is not also a class.
     expect(d.classes).toHaveLength(0);
   });
@@ -154,13 +152,14 @@ describe('parser: enums', () => {
   it('parses a single-line enum body', () => {
     const d = parse('enum Color { RED, GREEN, BLUE }');
     expect(d.errors).toEqual([]);
-    expect(d.enums[0].values).toEqual(['RED', 'GREEN', 'BLUE']);
+    expect(d.enums[0].values.map((v) => v.name)).toEqual(['RED', 'GREEN', 'BLUE']);
   });
 
   it('parses an empty enum without braces', () => {
     const d = parse('enum Empty');
     expect(d.errors).toEqual([]);
-    expect(d.enums[0]).toEqual({ name: 'Empty', values: [] });
+    expect(d.enums[0].name).toBe('Empty');
+    expect(d.enums[0].values).toEqual([]);
   });
 
   it('supports comma-separated values across lines', () => {
@@ -169,7 +168,7 @@ describe('parser: enums', () => {
       C
     }`);
     expect(d.errors).toEqual([]);
-    expect(d.enums[0].values).toEqual(['A', 'B', 'C']);
+    expect(d.enums[0].values.map((v) => v.name)).toEqual(['A', 'B', 'C']);
   });
 
   it('lets an enum be a relationship endpoint without creating a stub class', () => {
@@ -264,5 +263,75 @@ describe('parser: abstract classes and interfaces', () => {
     const d = parse('class AbstractThing { +x: int }');
     expect(d.classes[0].name).toBe('AbstractThing');
     expect(d.classes[0].stereotype).toBeUndefined();
+  });
+});
+
+describe('parser: source spans (for in-place editing)', () => {
+  // The defining property: slicing the source by a captured span yields exactly
+  // the token/line that produced the rendered element.
+  const sliceOf = (src: string, span: { start: number; end: number }) =>
+    src.slice(span.start, span.end);
+
+  it('captures the class name span', () => {
+    const src = 'class User {\n  -name: string\n}';
+    const d = parse(src);
+    const span = d.classes[0].nameSpan!;
+    expect(span).toBeDefined();
+    expect(sliceOf(src, span)).toBe('User');
+  });
+
+  it('captures name spans for abstract classes and interfaces (after the keyword)', () => {
+    const abs = 'abstract class Account';
+    expect(sliceOf(abs, parse(abs).classes[0].nameSpan!)).toBe('Account');
+    const iface = 'interface Authenticatable';
+    expect(sliceOf(iface, parse(iface).classes[0].nameSpan!)).toBe('Authenticatable');
+  });
+
+  it('captures field and method line spans covering the whole member', () => {
+    const src = 'class User {\n  -name: string\n  +login(pw: string): bool\n}';
+    const d = parse(src);
+    expect(sliceOf(src, d.classes[0].fields[0].span!)).toBe('-name: string');
+    expect(sliceOf(src, d.classes[0].methods[0].span!)).toBe('+login(pw: string): bool');
+  });
+
+  it('captures a span for a single-line class body member', () => {
+    const src = 'class X { +a: int }';
+    const d = parse(src);
+    expect(sliceOf(src, d.classes[0].fields[0].span!)).toBe('+a: int');
+  });
+
+  it('captures the enum name span', () => {
+    const src = 'enum Status {\n  ACTIVE\n}';
+    const d = parse(src);
+    expect(sliceOf(src, d.enums[0].nameSpan!)).toBe('Status');
+  });
+
+  it('captures a span for each enum value (newline- and comma-separated)', () => {
+    const src = 'enum Mix {\n  A, B\n  C\n}';
+    const d = parse(src);
+    const vals = d.enums[0].values;
+    expect(vals.map((v) => v.name)).toEqual(['A', 'B', 'C']);
+    for (const v of vals) {
+      expect(v.span).toBeDefined();
+      expect(sliceOf(src, v.span!)).toBe(v.name);
+    }
+  });
+
+  it('captures value spans for a single-line enum body', () => {
+    const src = 'enum Color { RED, GREEN, BLUE }';
+    const d = parse(src);
+    for (const v of d.enums[0].values) {
+      expect(sliceOf(src, v.span!)).toBe(v.name);
+    }
+  });
+
+  it('distinguishes repeated identical values by their own spans', () => {
+    const src = 'enum Dup {\n  X\n  X\n}';
+    const d = parse(src);
+    const [a, b] = d.enums[0].values;
+    expect(sliceOf(src, a.span!)).toBe('X');
+    expect(sliceOf(src, b.span!)).toBe('X');
+    // Two distinct occurrences, not the same offset.
+    expect(a.span!.start).not.toBe(b.span!.start);
   });
 });

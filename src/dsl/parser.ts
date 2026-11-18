@@ -20,6 +20,7 @@ import type {
   ParseError,
   Relationship,
   RelationshipKind,
+  Span,
   Visibility,
 } from './ast';
 
@@ -67,6 +68,29 @@ export function parse(source: string): Diagram {
 
   const rawLines = source.split('\n');
   let i = 0;
+
+  // Absolute offset of the first character of each line, so a column within a
+  // line maps to an absolute source offset: abs = lineStart[line] + col.
+  const lineStart: number[] = new Array(rawLines.length);
+  {
+    let acc = 0;
+    for (let k = 0; k < rawLines.length; k++) {
+      lineStart[k] = acc;
+      acc += rawLines[k].length + 1; // +1 for the '\n' removed by split
+    }
+  }
+
+  // Build a span for a token on a given line, searching from `fromCol` so e.g.
+  // a class name isn't accidentally matched inside the `class` keyword. Returns
+  // undefined if the token can't be located (caller then leaves the node
+  // non-editable).
+  const spanOf = (lineNo: number, token: string, fromCol = 0): Span | undefined => {
+    if (!token) return undefined;
+    const col = rawLines[lineNo].indexOf(token, fromCol);
+    if (col === -1) return undefined;
+    const start = lineStart[lineNo] + col;
+    return { start, end: start + token.length };
+  };
 
   const err = (line: number, col: number, message: string) =>
     errors.push({ line: line + 1, col: col + 1, message });
@@ -129,9 +153,15 @@ export function parse(source: string): Diagram {
       }
 
       const en = ensureEnum(name);
+      // Locate the name after the `enum` keyword on the raw line.
+      en.nameSpan = spanOf(lineNo, name, rawLines[lineNo].indexOf('enum') + 4);
 
-      // Collect comma- and/or newline-separated values from a body.
-      const addValues = (body: string, atLine: number) => {
+      // Collect comma- and/or newline-separated values from a body. Each value's
+      // span is found by searching the raw line directly from a running cursor,
+      // so spans stay correct regardless of whitespace or comment stripping.
+      // `searchFrom` seeds the cursor (e.g. just past the opening `{`).
+      const addValues = (body: string, atLine: number, searchFrom: number) => {
+        let cursor = searchFrom;
         for (const part of body.split(/[,\n]/)) {
           const v = part.trim();
           if (!v) continue;
@@ -139,7 +169,15 @@ export function parse(source: string): Diagram {
             err(atLine, 0, `Invalid enum value "${v}" in "${name}".`);
             continue;
           }
-          en.values.push(v);
+          const col = rawLines[atLine].indexOf(v, cursor);
+          if (col === -1) {
+            // Can't localize — push without a span (renders non-editable).
+            en.values.push({ name: v });
+            continue;
+          }
+          const start = lineStart[atLine] + col;
+          en.values.push({ name: v, span: { start, end: start + v.length } });
+          cursor = col + v.length;
         }
       };
 
@@ -149,25 +187,27 @@ export function parse(source: string): Diagram {
         continue;
       }
 
+      // Column (within the raw line) just after the opening `{`.
+      const afterBraceCol = rawLines[lineNo].indexOf('{') + 1;
       const afterBrace = rest.slice(braceIdx + 1);
       if (afterBrace.includes('}')) {
-        addValues(afterBrace.slice(0, afterBrace.indexOf('}')), lineNo);
+        addValues(afterBrace.slice(0, afterBrace.indexOf('}')), lineNo, afterBraceCol);
         i++;
         continue;
       }
 
-      if (afterBrace.trim()) addValues(afterBrace, lineNo);
+      if (afterBrace.trim()) addValues(afterBrace, lineNo, afterBraceCol);
       i++;
       let closed = false;
       while (i < rawLines.length) {
         const bodyLine = stripComment(rawLines[i]).trim();
         if (bodyLine.includes('}')) {
-          addValues(bodyLine.slice(0, bodyLine.indexOf('}')), i);
+          addValues(bodyLine.slice(0, bodyLine.indexOf('}')), i, 0);
           closed = true;
           i++;
           break;
         }
-        if (bodyLine) addValues(bodyLine, i);
+        if (bodyLine) addValues(bodyLine, i, 0);
         i++;
       }
       if (!closed) err(lineNo, 0, `Enum "${name}" is missing a closing "}".`);
@@ -214,6 +254,12 @@ export function parse(source: string): Diagram {
 
       // Apply the stereotype (last declaration wins if re-declared).
       if (classKeyword.stereotype) cls.stereotype = classKeyword.stereotype;
+      // Locate the name after the keyword prefix on the raw line.
+      cls.nameSpan = spanOf(
+        lineNo,
+        name,
+        rawLines[lineNo].indexOf(classKeyword.prefix) + classKeyword.prefix.length
+      );
 
       if (braceIdx === -1) {
         // No brace: either `class Name` alone, or `class Name {` on next lines.
@@ -221,29 +267,48 @@ export function parse(source: string): Diagram {
         continue;
       }
 
+      // Column (within the raw line) just after the opening `{`.
+      const afterBraceCol = rawLines[lineNo].indexOf('{') + 1;
+
       // Body may close on the same line: `class X { +a: int }`
       const afterBrace = rest.slice(braceIdx + 1);
       if (afterBrace.includes('}')) {
-        const body = afterBrace.slice(0, afterBrace.indexOf('}')).trim();
-        if (body) parseMember(body, cls, lineNo, 0, err);
+        const trimmed = afterBrace.slice(0, afterBrace.indexOf('}')).trim();
+        if (trimmed) {
+          const col = rawLines[lineNo].indexOf(trimmed, afterBraceCol);
+          const base = col === -1 ? lineStart[lineNo] + afterBraceCol : lineStart[lineNo] + col;
+          parseMember(trimmed, cls, lineNo, 0, base, err);
+        }
         i++;
         continue;
       }
 
       // Multi-line body: consume until a line containing `}`.
-      if (afterBrace.trim()) parseMember(afterBrace.trim(), cls, lineNo, 0, err);
+      const firstTrimmed = afterBrace.trim();
+      if (firstTrimmed) {
+        const col = rawLines[lineNo].indexOf(firstTrimmed, afterBraceCol);
+        const base = col === -1 ? lineStart[lineNo] + afterBraceCol : lineStart[lineNo] + col;
+        parseMember(firstTrimmed, cls, lineNo, 0, base, err);
+      }
       i++;
       let closed = false;
       while (i < rawLines.length) {
-        const bodyLine = stripComment(rawLines[i]).trim();
+        const bodyRaw = stripComment(rawLines[i]);
+        const bodyLine = bodyRaw.trim();
         if (bodyLine.includes('}')) {
           const before = bodyLine.slice(0, bodyLine.indexOf('}')).trim();
-          if (before) parseMember(before, cls, i, 0, err);
+          if (before) {
+            const base = lineStart[i] + bodyRaw.indexOf(before);
+            parseMember(before, cls, i, 0, base, err);
+          }
           closed = true;
           i++;
           break;
         }
-        if (bodyLine) parseMember(bodyLine, cls, i, 0, err);
+        if (bodyLine) {
+          const base = lineStart[i] + bodyRaw.indexOf(bodyLine);
+          parseMember(bodyLine, cls, i, 0, base, err);
+        }
         i++;
       }
       if (!closed) err(lineNo, 0, `"${name}" is missing a closing "}".`);
@@ -264,13 +329,17 @@ export function parse(source: string): Diagram {
 }
 
 // Parse a single member line into either a field or a method on `cls`.
+// `base` is the absolute source offset of the first character of `line`, so the
+// whole member-line content gets a span for in-place editing.
 function parseMember(
   line: string,
   cls: ClassNode,
   lineNo: number,
   col: number,
+  base: number,
   err: (line: number, col: number, message: string) => void
 ): void {
+  const span: Span = { start: base, end: base + line.length };
   let rest = line;
   let visibility: Visibility = 'public';
   const first = rest[0];
@@ -300,7 +369,7 @@ function parseMember(
           return { name: pname, type: ptype || undefined };
         })
       : [];
-    const method: Method = { visibility, name, params, returnType };
+    const method: Method = { visibility, name, params, returnType, span };
     cls.methods.push(method);
     return;
   }
@@ -313,7 +382,7 @@ function parseMember(
     err(lineNo, col, 'Empty member definition.');
     return;
   }
-  const member: Member = { visibility, name, type };
+  const member: Member = { visibility, name, type, span };
   cls.fields.push(member);
 }
 

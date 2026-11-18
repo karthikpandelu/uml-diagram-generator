@@ -87,7 +87,7 @@ User --> Status`);
     expect(classNode(laid, 'User').kind).toBe('class');
     const status = enumNode(laid, 'Status');
     expect(status.kind).toBe('enum');
-    expect(status.values).toEqual(['A', 'B']);
+    expect(status.values.map((v) => v.text)).toEqual(['A', 'B']);
   });
 
   it('emits an edge only when both endpoints are known', () => {
@@ -109,5 +109,17 @@ User --> Status`);
     expect(Number.isFinite(a.y)).toBe(true);
     expect(a.width).toBeGreaterThan(0);
     expect(a.height).toBeGreaterThan(0);
+  });
+
+  it('carries source spans from the AST onto the laid-out lines', () => {
+    const src = 'class A {\n  +x: int\n  +f(): void\n}';
+    const laid = layout(parse(src));
+    const a = classNode(laid, 'A');
+    expect(a.nameSpan).toBeDefined();
+    expect(src.slice(a.nameSpan!.start, a.nameSpan!.end)).toBe('A');
+    expect(a.fieldLines[0].span).toBeDefined();
+    expect(src.slice(a.fieldLines[0].span!.start, a.fieldLines[0].span!.end)).toBe('+x: int');
+    expect(a.methodLines[0].span).toBeDefined();
+    expect(src.slice(a.methodLines[0].span!.start, a.methodLines[0].span!.end)).toBe('+f(): void');
   });
 });

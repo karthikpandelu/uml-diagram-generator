@@ -1,8 +1,16 @@
 // Layout: turn a parsed Diagram into positioned boxes and routed edges using Dagre.
 
 import dagre from '@dagrejs/dagre';
-import type { ClassNode, Diagram, EnumNode, Relationship } from '../dsl/ast';
+import type { ClassNode, Diagram, EnumNode, Relationship, Span } from '../dsl/ast';
 import { VISIBILITY_SYMBOL } from '../dsl/ast';
+
+// A rendered line of text paired with the source span that produced it, so the
+// renderer can make it editable in place. `span` is absent when the piece can't
+// be mapped back to the source (then it renders non-editable).
+export interface Line {
+  text: string;
+  span?: Span;
+}
 
 export interface LaidOutClass {
   kind: 'class';
@@ -12,8 +20,9 @@ export interface LaidOutClass {
   width: number;
   height: number;
   headerHeight: number;
-  fieldLines: string[];
-  methodLines: string[];
+  nameSpan?: Span;
+  fieldLines: Line[];
+  methodLines: Line[];
 }
 
 export interface LaidOutEnum {
@@ -24,7 +33,8 @@ export interface LaidOutEnum {
   width: number;
   height: number;
   headerHeight: number;
-  values: string[];
+  nameSpan?: Span;
+  values: Line[];
 }
 
 export type LaidOutNode = LaidOutClass | LaidOutEnum;
@@ -77,15 +87,15 @@ type ClassMetrics = Omit<LaidOutClass, 'x' | 'y' | 'node' | 'kind'>;
 type EnumMetrics = Omit<LaidOutEnum, 'x' | 'y' | 'node' | 'kind'>;
 
 function measure(cls: ClassNode): ClassMetrics {
-  const fieldLines = cls.fields.map(memberLine);
-  const methodLines = cls.methods.map(methodLine);
+  const fieldLines: Line[] = cls.fields.map((f) => ({ text: memberLine(f), span: f.span }));
+  const methodLines: Line[] = cls.methods.map((m) => ({ text: methodLine(m), span: m.span }));
 
   const stereotypeLine = cls.stereotype ? CLASS_STEREOTYPE_LABEL[cls.stereotype] : undefined;
   const allLines = [
     cls.name,
     ...(stereotypeLine ? [stereotypeLine] : []),
-    ...fieldLines,
-    ...methodLines,
+    ...fieldLines.map((l) => l.text),
+    ...methodLines.map((l) => l.text),
   ];
   const longest = allLines.reduce((max, l) => Math.max(max, l.length), 0);
   const width = Math.max(MIN_WIDTH, Math.ceil(longest * CHAR_WIDTH) + PADDING_X * 2);
@@ -101,13 +111,13 @@ function measure(cls: ClassNode): ClassMetrics {
       : COMPARTMENT_PADDING_Y * 2;
   const height = headerHeight + fieldsHeight + methodsHeight;
 
-  return { width, height, headerHeight, fieldLines, methodLines };
+  return { width, height, headerHeight, nameSpan: cls.nameSpan, fieldLines, methodLines };
 }
 
 function measureEnum(en: EnumNode): EnumMetrics {
-  const values = en.values;
+  const values: Line[] = en.values.map((v) => ({ text: v.name, span: v.span }));
   // The stereotype line and the name both live in the header.
-  const allLines = [ENUM_STEREOTYPE, en.name, ...values];
+  const allLines = [ENUM_STEREOTYPE, en.name, ...values.map((l) => l.text)];
   const longest = allLines.reduce((max, l) => Math.max(max, l.length), 0);
   const width = Math.max(MIN_WIDTH, Math.ceil(longest * CHAR_WIDTH) + PADDING_X * 2);
 
@@ -118,7 +128,7 @@ function measureEnum(en: EnumNode): EnumMetrics {
       : COMPARTMENT_PADDING_Y * 2;
   const height = headerHeight + valuesHeight;
 
-  return { width, height, headerHeight, values };
+  return { width, height, headerHeight, nameSpan: en.nameSpan, values };
 }
 
 export function layout(diagram: Diagram): LaidOutDiagram {
