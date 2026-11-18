@@ -1,51 +1,48 @@
-export const DEFAULT_SOURCE = `// UML Class Diagram — edit this text and watch the diagram update.
+export const DEFAULT_SOURCE = `// UML Class Diagram — edit this text (or double-click any name/member in the
+// diagram) and watch it update. This sample shows every node kind, member
+// style, and relationship the notation supports.
 
-abstract class Account {
+abstract class BaseClass {
   #id: int
-  +login(password: string): bool
-  +logout()
+  +process(input: string): bool
+  +reset()
 }
 
-interface Authenticatable {
-  +authenticate(token: string): bool
+interface InterfaceA {
+  +execute(token: string): bool
 }
 
-class User {
-  -name: string
-  #createdAt: date
+class ClassA {
+  -fieldA: string
+  #fieldB: date
+  +methodA(x: int, y: int): void
 }
 
-class Admin {
-  +permissions: string
-  +ban(user: User)
+class ClassB {
+  +fieldC: float
+  +status: EnumA
 }
 
-class Order {
-  +total: float
-  +status: OrderStatus
+class ClassC {
+  +fieldD: int
 }
 
-enum OrderStatus {
-  PENDING
-  PAID
-  SHIPPED
-  CANCELLED
+class ClassD
+class ClassE
+class ClassF
+
+enum EnumA {
+  VALUE_ONE
+  VALUE_TWO
+  VALUE_THREE
 }
 
-class LineItem {
-  +qty: int
-}
-
-class Product
-class Cart
-class Logger
-
-User --|> Account           // inheritance (abstract base)
-User ..|> Authenticatable   // realization (interface)
-Admin --|> User             // inheritance
-User "1" --> "*" Order : places   // association
-Order *-- LineItem          // composition
-Cart o-- Product            // aggregation
-User ..> Logger             // dependency
-Order --> OrderStatus       // association to an enum
+ClassA --|> BaseClass          // inheritance (generalization)
+ClassA ..|> InterfaceA         // realization (implements interface)
+ClassB --|> ClassA             // inheritance
+ClassA "1" --> "*" ClassB : association   // association with multiplicities + label
+ClassB *-- ClassC              // composition
+ClassD o-- ClassE              // aggregation
+ClassA ..> ClassF              // dependency
+ClassB --> EnumA               // association to an enum
 `;
