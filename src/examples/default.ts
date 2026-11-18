@@ -1,15 +1,22 @@
 export const DEFAULT_SOURCE = `// UML Class Diagram — edit this text (or double-click any name/member in the
 // diagram) and watch it update. This sample shows every node kind, member
 // style, and relationship the notation supports.
+//
+// The type hierarchy reads top-to-bottom the way a real system layers it:
+//   InterfaceA  (contract, most abstract)
+//      ▲  realization
+//   BaseClass   (abstract — partial implementation)
+//      ▲  inheritance
+//   ClassA      (concrete — full implementation)
+
+interface InterfaceA {
+  +execute(token: string): bool
+}
 
 abstract class BaseClass {
   #id: int
   +process(input: string): bool
   +reset()
-}
-
-interface InterfaceA {
-  +execute(token: string): bool
 }
 
 class ClassA {
@@ -37,9 +44,8 @@ enum EnumA {
   VALUE_THREE
 }
 
-ClassA --|> BaseClass          // inheritance (generalization)
-ClassA ..|> InterfaceA         // realization (implements interface)
-ClassB --|> ClassA             // inheritance
+BaseClass ..|> InterfaceA      // realization (abstract class implements the interface)
+ClassA --|> BaseClass          // inheritance (concrete class extends the abstract base)
 ClassA "1" --> "*" ClassB : association   // association with multiplicities + label
 ClassB *-- ClassC              // composition
 ClassD o-- ClassE              // aggregation

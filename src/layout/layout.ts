@@ -155,7 +155,17 @@ export function layout(diagram: Diagram): LaidOutDiagram {
 
   for (const rel of diagram.relationships) {
     if (known.has(rel.from) && known.has(rel.to)) {
-      g.setEdge(rel.from, rel.to);
+      // Dagre ranks an edge's source ABOVE its target (rankdir TB). For
+      // inheritance/realization the UML arrow points child → parent, so feeding
+      // it to Dagre as-is would rank the child on top. Reverse those two kinds so
+      // the supertype (interface, then abstract base) sits above its subtypes —
+      // the conventional top-down class hierarchy. The drawn edge is unaffected
+      // (arrowheads/polyline come from `diagram.relationships`, not this graph).
+      if (rel.kind === 'inheritance' || rel.kind === 'realization') {
+        g.setEdge(rel.to, rel.from);
+      } else {
+        g.setEdge(rel.from, rel.to);
+      }
     }
   }
 
@@ -177,8 +187,13 @@ export function layout(diagram: Diagram): LaidOutDiagram {
   const edges: LaidOutEdge[] = diagram.relationships
     .filter((rel) => known.has(rel.from) && known.has(rel.to))
     .map((rel) => {
-      const e = g.edge(rel.from, rel.to);
-      const points: Point[] = (e?.points ?? []).map((p) => ({ x: p.x, y: p.y }));
+      // Inheritance/realization were inserted reversed (see above), so look them
+      // up by the reversed key and flip the returned polyline back to child→parent
+      // so the arrowhead still lands on the parent end.
+      const reversed = rel.kind === 'inheritance' || rel.kind === 'realization';
+      const e = reversed ? g.edge(rel.to, rel.from) : g.edge(rel.from, rel.to);
+      let points: Point[] = (e?.points ?? []).map((p) => ({ x: p.x, y: p.y }));
+      if (reversed) points = points.slice().reverse();
       return { rel, points };
     });
 
